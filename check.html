@@ -8,20 +8,27 @@
 </head>
 <body>
   <div class="container">
-    <!-- 导航栏 -->
-    <nav class="navbar">
-      <div class="nav-title">打卡项目</div>
-    </nav>
+    <!-- 激励语 -->
+    <div class="card welcome-card">
+      <div class="welcome-text">学习很苦</div>
+      <div class="welcome-text cool-text">坚持很酷</div>
+    </div>
     
     <!-- 打卡项目列表 -->
     <div class="item-list" id="checkItems">
       <!-- 项目将通过JS动态生成 -->
     </div>
     
-    <!-- 添加项目按钮 -->
-    <div class="card add-item-card" onclick="showAddItemModal()">
-      <span class="add-icon">+</span>
-      <span>添加项目</span>
+    <!-- 功能按钮区域 -->
+    <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+      <div class="card add-item-card" onclick="showAddItemModal()" style="flex: 1;">
+        <span class="add-icon">+</span>
+        <span>添加项目</span>
+      </div>
+      <div class="card add-item-card" onclick="toggleManageMode()" style="flex: 1; background-color: #f0f8ff; border-color: #ff6b6b;">
+        <span class="add-icon">🗑️</span>
+        <span>删除项目</span>
+      </div>
     </div>
     
     <!-- 底部导航 -->
@@ -166,18 +173,34 @@
         `).join('');
       }
       
-      // 添加管理按钮
-      const manageBtn = isManageMode 
-        ? `<button class="btn-manage" onclick="toggleManageMode()">完成</button>`
-        : `<button class="btn-manage" onclick="toggleManageMode()">管理</button>`;
+      // 管理模式下的操作栏
+      // 先清除旧的操作栏
+      const oldActionBar = document.querySelector('.action-bar');
+      if (oldActionBar) {
+        oldActionBar.remove();
+      }
       
-      // 在导航栏添加管理按钮
-      document.querySelector('.navbar').innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div class="nav-title">${isManageMode ? '选择要删除的项目' : '打卡项目'}</div>
-          ${manageBtn}
-        </div>
-      `;
+      if (isManageMode) {
+        // 在页面顶部添加操作栏
+        const actionBar = document.createElement('div');
+        actionBar.className = 'card action-bar';
+        actionBar.style.display = 'flex';
+        actionBar.style.justifyContent = 'space-between';
+        actionBar.style.alignItems = 'center';
+        actionBar.style.marginBottom = '20px';
+        actionBar.innerHTML = `
+          <div style="font-weight: bold; color: #333;">删除项目</div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn-manage" onclick="toggleManageMode()">取消</button>
+            <button class="btn-manage delete-btn" onclick="batchDelete()" ${selectedItems.length === 0 ? 'disabled' : ''}>删除(${selectedItems.length})</button>
+          </div>
+        `;
+        
+        // 插入到激励语卡片下方
+        const container = document.querySelector('.container');
+        const welcomeCard = document.querySelector('.welcome-card');
+        container.insertBefore(actionBar, welcomeCard.nextSibling);
+      }
       
       // 添加样式
       if (!document.getElementById('item-styles')) {
@@ -191,7 +214,9 @@
           .btn-manage { padding: 8px 16px; background-color: #4CAF50; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
           .item-checkbox { width: 24px; height: 24px; border: 2px solid #ddd; border-radius: 4px; margin-right: 15px; display: flex; align-items: center; justify-content: center; background: white; transition: all 0.2s; }
           .item-checkbox.checked { background: #f44336; border-color: #f44338; color: white; }
-          .item-card.selected { background-color: #fff3f3; border: 2px solid #f44336; }
+        .item-card.selected { background-color: #fff3f3; border: 2px solid #f44336; }
+        .delete-btn { background-color: #f44336; margin-left: 10px; }
+        .delete-btn:disabled { background-color: #ccc; cursor: not-allowed; }
         `;
         document.head.appendChild(style);
       }
@@ -203,12 +228,38 @@
       renderItems();
     }
     
+    function batchDelete() {
+      if (selectedItems.length === 0) {
+        wx.showToast({ title: '请选择要删除的项目' });
+        return;
+      }
+      
+      document.getElementById('deleteCount').textContent = selectedItems.length;
+      document.getElementById('deleteModal').style.display = 'flex';
+    }
+    
+    function closeDeleteModal() {
+      document.getElementById('deleteModal').style.display = 'none';
+    }
+    
+    function confirmDelete() {
+      const updatedItems = checkItems.filter(item => !selectedItems.includes(item.id));
+      wx.setStorageSync('checkItems', updatedItems);
+      
+      wx.showToast({ title: '删除成功' });
+      isManageMode = false;
+      selectedItems = [];
+      closeDeleteModal();
+      loadCheckItems();
+    }
+    
     function toggleSelect(itemId) {
       if (selectedItems.includes(itemId)) {
         selectedItems = selectedItems.filter(id => id !== itemId);
       } else {
         selectedItems.push(itemId);
       }
+      // 重新渲染以更新删除按钮状态
       renderItems();
     }
     
@@ -252,11 +303,23 @@
     function submitCheck() {
       if (!currentItem) return;
       
+      // 检查当天是否已经打卡
       const now = new Date();
       const date = now.toLocaleDateString('zh-CN');
+      const checkRecords = wx.getStorageSync('checkRecords') || [];
+      
+      // 检查当天该项目是否已经打卡
+      const todayRecord = checkRecords.find(record => 
+        record.itemId === currentItem.id && record.date === date
+      );
+      
+      if (todayRecord) {
+        wx.showToast({ title: '该项目今天已经打卡过了' });
+        return;
+      }
+      
       const time = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
       
-      const checkRecords = wx.getStorageSync('checkRecords') || [];
       const newRecord = {
         id: Date.now(),
         itemId: currentItem.id,
