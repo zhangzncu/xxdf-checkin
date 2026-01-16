@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>打卡 - 儿童学习打卡</title>
+  <title>打卡 - 坚持很酷</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,7 +15,7 @@
     </div>
     
     <!-- 打卡项目列表 -->
-    <div class="item-list" id="checkItems">
+    <div class="item-list" id="checkItems" style="display: flex; flex-wrap: wrap; gap: 15px;">
       <!-- 项目将通过JS动态生成 -->
     </div>
     
@@ -151,7 +151,7 @@
       if (isManageMode) {
         // 管理模式
         container.innerHTML = checkItems.map(item => `
-          <div class="card item-card ${selectedItems.includes(item.id) ? 'selected' : ''}" onclick="toggleSelect(${item.id})">
+          <div class="card item-card ${selectedItems.includes(item.id) ? 'selected' : ''}" onclick="toggleSelect(${item.id})" style="flex: 1; min-width: calc(50% - 10px); max-width: calc(50% - 10px); padding: 15px; display: flex; align-items: center;">
             <div class="item-checkbox ${selectedItems.includes(item.id) ? 'checked' : ''}">
               ${selectedItems.includes(item.id) ? '✓' : ''}
             </div>
@@ -165,12 +165,12 @@
         }
       } else {
         // 正常模式
-        container.innerHTML = checkItems.map(item => `
-          <div class="card item-card" onclick="openCheckModal(${item.id}, '${item.name}')">
-            <span class="item-icon">${getIcon(item.icon)}</span>
-            <span class="item-name">${item.name}</span>
-          </div>
-        `).join('');
+      container.innerHTML = checkItems.map(item => `
+        <div class="card item-card" onclick="openCheckModal(${item.id}, '${item.name}')" style="flex: 1; min-width: calc(50% - 10px); max-width: calc(50% - 10px); text-align: center; padding: 25px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <span class="item-icon">${getIcon(item.icon)}</span>
+          <span class="item-name">${item.name}</span>
+        </div>
+      `).join('');
       }
       
       // 管理模式下的操作栏
