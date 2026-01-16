@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>打卡 - 儿童学习打卡</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 导航栏 -->
+    <nav class="navbar">
+      <div class="nav-title">打卡项目</div>
+    </nav>
+    
+    <!-- 打卡项目列表 -->
+    <div class="item-list" id="checkItems">
+      <!-- 项目将通过JS动态生成 -->
+    </div>
+    
+    <!-- 添加项目按钮 -->
+    <div class="card add-item-card" onclick="showAddItemModal()">
+      <span class="add-icon">+</span>
+      <span>添加项目</span>
+    </div>
+    
+    <!-- 底部导航 -->
+    <div class="tab-bar">
+      <a href="index.html" class="tab-item">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-text">首页</span>
+      </a>
+      <a href="check.html" class="tab-item active">
+        <span class="tab-icon">✅</span>
+        <span class="tab-text">打卡</span>
+      </a>
+      <a href="record.html" class="tab-item">
+        <span class="tab-icon">📋</span>
+        <span class="tab-text">记录</span>
+      </a>
+      <a href="prize.html" class="tab-item">
+        <span class="tab-icon">🎁</span>
+        <span class="tab-text">奖品</span>
+      </a>
+      <a href="setting.html" class="tab-item">
+        <span class="tab-icon">⚙️</span>
+        <span class="tab-text">设置</span>
+      </a>
+    </div>
+  </div>
+  
+  <!-- 打卡弹窗 -->
+  <div class="modal" id="checkModal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-title" id="modalTitle">打卡</div>
+      <div class="stars-label">选择完成情况</div>
+      <div class="stars-selector" id="starsSelector"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeCheckModal()">取消</button>
+        <button class="btn-primary" onclick="submitCheck()">确认打卡</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 添加项目弹窗 -->
+  <div class="modal" id="addItemModal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-title">添加项目</div>
+      <div class="form-group">
+        <label class="form-label">项目名称</label>
+        <input type="text" class="form-input" id="itemNameInput" placeholder="请输入项目名称">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeAddItemModal()">取消</button>
+        <button class="btn-primary" onclick="submitAddItem()">添加</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 管理模式弹窗 -->
+  <div class="modal" id="deleteModal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-title">删除确认</div>
+      <p style="text-align: center; margin-bottom: 15px; color: #666;">确定要删除选中的 <span id="deleteCount">0</span> 个项目吗？</p>
+      <p style="text-align: center; font-size: 12px; color: #999; margin-bottom: 20px;">已累积的星星不会被删除</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeDeleteModal()">取消</button>
+        <button class="btn-primary" style="background-color: #f44336;" onclick="confirmDelete()">确认删除</button>
+      </div>
+    </div>
+  </div>
+  
+  <style>
+    .form-group { margin-bottom: 20px; }
+    .form-label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
+    .form-input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+    .add-item-card { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; cursor: pointer; border: 2px dashed #4CAF50; background-color: #f0f8ff; }
+    .add-icon { font-size: 32px; color: #4CAF50; margin-bottom: 10px; }
+  </style>
+  
+  <script src="wx-api.js"></script>
+  <script>
+    let checkItems = [];
+    let isManageMode = false;
+    let selectedItems = [];
+    let currentItem = null;
+    let selectedStars = 1;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      loadCheckItems();
+    });
+    
+    function loadCheckItems() {
+      let items = wx.getStorageSync('checkItems');
+      if (!items || !Array.isArray(items)) {
+        items = [
+          { id: 1, name: '红火箭', icon: 'book' },
+          { id: 2, name: '古诗词', icon: 'read' },
+          { id: 3, name: '练字', icon: 'write' },
+          { id: 4, name: '计算', icon: 'calculate' },
+          { id: 5, name: '思维', icon: 'thinking' }
+        ];
+        wx.setStorageSync('checkItems', items);
+      }
+      checkItems = items;
+      renderItems();
+    }
+    
+    function getIcon(iconType) {
+      const icons = {
+        'book': '📚',
+        'read': '📖',
+        'write': '✍️',
+        'calculate': '🧮',
+        'thinking': '💡',
+        'default': '📝'
+      };
+      return icons[iconType] || icons['default'];
+    }
+    
+    function renderItems() {
+      const container = document.getElementById('checkItems');
+      
+      if (isManageMode) {
+        // 管理模式
+        container.innerHTML = checkItems.map(item => `
+          <div class="card item-card ${selectedItems.includes(item.id) ? 'selected' : ''}" onclick="toggleSelect(${item.id})">
+            <div class="item-checkbox ${selectedItems.includes(item.id) ? 'checked' : ''}">
+              ${selectedItems.includes(item.id) ? '✓' : ''}
+            </div>
+            <span class="item-icon">${getIcon(item.icon)}</span>
+            <span class="item-name">${item.name}</span>
+          </div>
+        `).join('');
+        
+        if (checkItems.length === 0) {
+          container.innerHTML = '<div class="empty-record">暂无打卡项目</div>';
+        }
+      } else {
+        // 正常模式
+        container.innerHTML = checkItems.map(item => `
+          <div class="card item-card" onclick="openCheckModal(${item.id}, '${item.name}')">
+            <span class="item-icon">${getIcon(item.icon)}</span>
+            <span class="item-name">${item.name}</span>
+          </div>
+        `).join('');
+      }
+      
+      // 添加管理按钮
+      const manageBtn = isManageMode 
+        ? `<button class="btn-manage" onclick="toggleManageMode()">完成</button>`
+        : `<button class="btn-manage" onclick="toggleManageMode()">管理</button>`;
+      
+      // 在导航栏添加管理按钮
+      document.querySelector('.navbar').innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="nav-title">${isManageMode ? '选择要删除的项目' : '打卡项目'}</div>
+          ${manageBtn}
+        </div>
+      `;
+      
+      // 添加样式
+      if (!document.getElementById('item-styles')) {
+        const style = document.createElement('style');
+        style.id = 'item-styles';
+        style.textContent = `
+          .item-card { display: flex; align-items: center; padding: 20px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; }
+          .item-card:active { transform: scale(0.98); }
+          .item-icon { font-size: 28px; margin-right: 15px; }
+          .item-name { font-size: 16px; font-weight: bold; color: #333; }
+          .btn-manage { padding: 8px 16px; background-color: #4CAF50; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+          .item-checkbox { width: 24px; height: 24px; border: 2px solid #ddd; border-radius: 4px; margin-right: 15px; display: flex; align-items: center; justify-content: center; background: white; transition: all 0.2s; }
+          .item-checkbox.checked { background: #f44336; border-color: #f44338; color: white; }
+          .item-card.selected { background-color: #fff3f3; border: 2px solid #f44336; }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+    
+    function toggleManageMode() {
+      isManageMode = !isManageMode;
+      selectedItems = [];
+      renderItems();
+    }
+    
+    function toggleSelect(itemId) {
+      if (selectedItems.includes(itemId)) {
+        selectedItems = selectedItems.filter(id => id !== itemId);
+      } else {
+        selectedItems.push(itemId);
+      }
+      renderItems();
+    }
+    
+    function openCheckModal(itemId, itemName) {
+      currentItem = { id: itemId, name: itemName };
+      selectedStars = 1;
+      
+      document.getElementById('modalTitle').textContent = `打卡 - ${itemName}`;
+      
+      const selector = document.getElementById('starsSelector');
+      selector.innerHTML = [1, 2, 3].map(level => `
+        <div class="star-item ${level === 1 ? 'active' : ''}" onclick="selectStars(${level})">
+          ${Array(3).fill(0).map((_, i) => `
+            <span class="star ${level >= i + 1 ? 'selected' : ''}">${level >= i + 1 ? '⭐' : '☆'}</span>
+          `).join('')}
+          <span class="star-text">${level}星</span>
+        </div>
+      `).join('');
+      
+      document.getElementById('checkModal').style.display = 'flex';
+    }
+    
+    function closeCheckModal() {
+      document.getElementById('checkModal').style.display = 'none';
+      currentItem = null;
+    }
+    
+    function selectStars(level) {
+      selectedStars = level;
+      const selector = document.getElementById('starsSelector');
+      selector.innerHTML = [1, 2, 3].map(l => `
+        <div class="star-item ${l === level ? 'active' : ''}" onclick="selectStars(${l})">
+          ${Array(3).fill(0).map((_, i) => `
+            <span class="star ${l >= i + 1 ? 'selected' : ''}">${l >= i + 1 ? '⭐' : '☆'}</span>
+          `).join('')}
+          <span class="star-text">${l}星</span>
+        </div>
+      `).join('');
+    }
+    
+    function submitCheck() {
+      if (!currentItem) return;
+      
+      const now = new Date();
+      const date = now.toLocaleDateString('zh-CN');
+      const time = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      
+      const checkRecords = wx.getStorageSync('checkRecords') || [];
+      const newRecord = {
+        id: Date.now(),
+        itemId: currentItem.id,
+        itemName: currentItem.name,
+        stars: selectedStars,
+        date: date,
+        time: time
+      };
+      checkRecords.push(newRecord);
+      wx.setStorageSync('checkRecords', checkRecords);
+      
+      const totalStars = wx.getStorageSync('totalStars') || 0;
+      wx.setStorageSync('totalStars', totalStars + selectedStars);
+      
+      wx.showToast({ title: '打卡成功' });
+      closeCheckModal();
+    }
+    
+    function showAddItemModal() {
+      document.getElementById('itemNameInput').value = '';
+      document.getElementById('addItemModal').style.display = 'flex';
+    }
+    
+    function closeAddItemModal() {
+      document.getElementById('addItemModal').style.display = 'none';
+    }
+    
+    function submitAddItem() {
+      const name = document.getElementById('itemNameInput').value.trim();
+      if (!name) {
+        wx.showToast({ title: '请输入项目名称' });
+        return;
+      }
+      
+      let maxId = 0;
+      checkItems.forEach(item => {
+        if (item.id > maxId) maxId = item.id;
+      });
+      
+      const newItem = {
+        id: maxId + 1,
+        name: name,
+        icon: 'default'
+      };
+      
+      checkItems.push(newItem);
+      wx.setStorageSync('checkItems', checkItems);
+      
+      wx.showToast({ title: '添加成功' });
+      closeAddItemModal();
+      loadCheckItems();
+    }
+    
+    function batchDelete() {
+      if (selectedItems.length === 0) {
+        wx.showToast({ title: '请选择要删除的项目' });
+        return;
+      }
+      
+      document.getElementById('deleteCount').textContent = selectedItems.length;
+      document.getElementById('deleteModal').style.display = 'flex';
+    }
+    
+    function closeDeleteModal() {
+      document.getElementById('deleteModal').style.display = 'none';
+    }
+    
+    function confirmDelete() {
+      const updatedItems = checkItems.filter(item => !selectedItems.includes(item.id));
+      wx.setStorageSync('checkItems', updatedItems);
+      
+      wx.showToast({ title: '删除成功' });
+      isManageMode = false;
+      selectedItems = [];
+      closeDeleteModal();
+      loadCheckItems();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>奖品 - 儿童学习打卡</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 导航栏 -->
+    <nav class="navbar">
+      <div class="nav-title">奖品兑换</div>
+    </nav>
+    
+    <!-- 星星总数 -->
+    <div class="card stars-card">
+      <div class="stars-label">当前星星</div>
+      <div class="stars-count" id="totalStars">0</div>
+      <div class="stars">
+        <span>⭐</span><span>⭐</span><span>⭐</span>
+      </div>
+    </div>
+    
+    <!-- 奖品列表 -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <span class="title" style="margin-bottom: 0;">奖品列表</span>
+        <button class="btn-manage" onclick="showAddPrizeModal()">添加奖品</button>
+      </div>
+      <div class="prizes-list" id="prizesList">
+        <div class="empty-record">暂无奖品</div>
+      </div>
+    </div>
+    
+    <!-- 底部导航 -->
+    <div class="tab-bar">
+      <a href="index.html" class="tab-item">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-text">首页</span>
+      </a>
+      <a href="check.html" class="tab-item">
+        <span class="tab-icon">✅</span>
+        <span class="tab-text">打卡</span>
+      </a>
+      <a href="record.html" class="tab-item">
+        <span class="tab-icon">📋</span>
+        <span class="tab-text">记录</span>
+      </a>
+      <a href="prize.html" class="tab-item active">
+        <span class="tab-icon">🎁</span>
+        <span class="tab-text">奖品</span>
+      </a>
+      <a href="setting.html" class="tab-item">
+        <span class="tab-icon">⚙️</span>
+        <span class="tab-text">设置</span>
+      </a>
+    </div>
+  </div>
+  
+  <!-- 添加奖品弹窗 -->
+  <div class="modal" id="addPrizeModal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-title">添加奖品</div>
+      <div class="form-group">
+        <label class="form-label">奖品名称</label>
+        <input type="text" class="form-input" id="prizeNameInput" placeholder="请输入奖品名称">
+      </div>
+      <div class="form-group">
+        <label class="form-label">所需星星</label>
+        <input type="number" class="form-input" id="prizeCostInput" placeholder="请输入所需星星数量">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeAddPrizeModal()">取消</button>
+        <button class="btn-primary" onclick="submitAddPrize()">添加</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 兑换确认弹窗 -->
+  <div class="modal" id="exchangeModal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-title">兑换确认</div>
+      <p style="text-align: center; margin-bottom: 15px;">确定要兑换 "<span id="exchangePrizeName"></span>" 吗？</p>
+      <p style="text-align: center; margin-bottom: 20px; color: #f44336; font-weight: bold;">需要 <span id="exchangeCost"></span> 颗星星</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeExchangeModal()">取消</button>
+        <button class="btn-primary" onclick="confirmExchange()">确认兑换</button>
+      </div>
+    </div>
+  </div>
+  
+  <style>
+    .btn-manage { padding: 8px 16px; background-color: #4CAF50; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    .prizes-list { max-height: 400px; overflow-y: auto; }
+    .prize-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #f0f0f0; }
+    .prize-item:last-child { border-bottom: none; }
+    .prize-name { font-size: 16px; font-weight: bold; color: #333; }
+    .prize-cost { display: flex; align-items: center; gap: 5px; }
+    .prize-cost .cost-label { font-size: 12px; color: #999; }
+    .prize-cost .cost-stars { font-size: 18px; font-weight: bold; color: #4CAF50; }
+    .exchange-btn { padding: 8px 16px; background-color: #4CAF50; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; margin-left: 15px; }
+    .exchange-btn:disabled { background-color: #ccc; cursor: not-allowed; }
+    .form-group { margin-bottom: 15px; }
+    .form-label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
+    .form-input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+  </style>
+  
+  <script src="wx-api.js"></script>
+  <script>
+    let prizes = [];
+    let currentPrize = null;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      loadPrizes();
+    });
+    
+    function loadPrizes() {
+      // 更新星星显示
+      const totalStars = wx.getStorageSync('totalStars') || 0;
+      document.getElementById('totalStars').textContent = totalStars;
+      
+      // 加载奖品列表
+      prizes = wx.getStorageSync('prizes') || [];
+      const container = document.getElementById('prizesList');
+      
+      if (prizes.length > 0) {
+        container.innerHTML = prizes.map(prize => `
+          <div class="prize-item">
+            <span class="prize-name">${prize.name}</span>
+            <div style="display: flex; align-items: center;">
+              <div class="prize-cost">
+                <span class="cost-label">需要</span>
+                <span class="cost-stars">${prize.cost}</span>
+                <span>⭐</span>
+              </div>
+              <button class="exchange-btn" onclick="openExchangeModal(${prize.id})" ${totalStars < prize.cost ? 'disabled' : ''}>
+                兑换
+              </button>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        container.innerHTML = '<div class="empty-record">暂无奖品</div>';
+      }
+    }
+    
+    function showAddPrizeModal() {
+      document.getElementById('prizeNameInput').value = '';
+      document.getElementById('prizeCostInput').value = '';
+      document.getElementById('addPrizeModal').style.display = 'flex';
+    }
+    
+    function closeAddPrizeModal() {
+      document.getElementById('addPrizeModal').style.display = 'none';
+    }
+    
+    function submitAddPrize() {
+      const name = document.getElementById('prizeNameInput').value.trim();
+      const cost = parseInt(document.getElementById('prizeCostInput').value);
+      
+      if (!name) {
+        wx.showToast({ title: '请输入奖品名称' });
+        return;
+      }
+      
+      if (!cost || cost <= 0) {
+        wx.showToast({ title: '请输入有效的星星数量' });
+        return;
+      }
+      
+      let maxId = 0;
+      prizes.forEach(prize => {
+        if (prize.id > maxId) maxId = prize.id;
+      });
+      
+      const newPrize = {
+        id: maxId + 1,
+        name: name,
+        description: '',
+        cost: cost
+      };
+      
+      prizes.push(newPrize);
+      wx.setStorageSync('prizes', prizes);
+      
+      wx.showToast({ title: '添加成功' });
+      closeAddPrizeModal();
+      loadPrizes();
+    }
+    
+    function openExchangeModal(prizeId) {
+      currentPrize = prizes.find(p => p.id === prizeId);
+      if (!currentPrize) return;
+      
+      const totalStars = wx.getStorageSync('totalStars') || 0;
+      if (totalStars < currentPrize.cost) {
+        wx.showToast({ title: '星星不足' });
+        return;
+      }
+      
+      document.getElementById('exchangePrizeName').textContent = currentPrize.name;
+      document.getElementById('exchangeCost').textContent = currentPrize.cost;
+      document.getElementById('exchangeModal').style.display = 'flex';
+    }
+    
+    function closeExchangeModal() {
+      document.getElementById('exchangeModal').style.display = 'none';
+      currentPrize = null;
+    }
+    
+    function confirmExchange() {
+      if (!currentPrize) return;
+      
+      const totalStars = wx.getStorageSync('totalStars') || 0;
+      if (totalStars < currentPrize.cost) {
+        wx.showToast({ title: '星星不足' });
+        return;
+      }
+      
+      // 扣除星星
+      wx.setStorageSync('totalStars', totalStars - currentPrize.cost);
+      
+      // 记录兑奖
+      const now = new Date();
+      const exchangeRecords = wx.getStorageSync('exchangeRecords') || [];
+      exchangeRecords.push({
+        id: Date.now(),
+        prizeId: currentPrize.id,
+        prizeName: currentPrize.name,
+        cost: currentPrize.cost,
+        date: now.toLocaleDateString('zh-CN'),
+        time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+      });
+      wx.setStorageSync('exchangeRecords', exchangeRecords);
+      
+      wx.showToast({ title: '兑换成功' });
+      closeExchangeModal();
+      loadPrizes();
+    }
+  </script>
+</body>
+</html>

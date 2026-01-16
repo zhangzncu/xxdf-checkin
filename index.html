@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>儿童学习打卡</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 导航栏 -->
+    <nav class="navbar">
+      <div class="nav-title">儿童学习打卡</div>
+    </nav>
+    
+    <!-- 激励语 -->
+    <div class="card welcome-card">
+      <div class="welcome-text">学习很苦</div>
+      <div class="welcome-text cool-text">坚持很酷</div>
+    </div>
+    
+    <!-- 星星总数 -->
+    <div class="card stars-card">
+      <div class="stars-label">累计星星</div>
+      <div class="stars-count" id="totalStars">0</div>
+      <div class="stars">
+        <span>⭐</span><span>⭐</span><span>⭐</span>
+      </div>
+    </div>
+    
+    <!-- 今日打卡 -->
+    <div class="card today-card">
+      <div class="title">今日打卡</div>
+      <div class="today-status" id="todayStatus">0/0 项已完成</div>
+      <div class="progress-bar">
+        <div class="progress" id="progressBar"></div>
+      </div>
+      <button class="btn-primary" onclick="goToCheck()">去打卡</button>
+    </div>
+    
+    <!-- 最近打卡 -->
+    <div class="card recent-card">
+      <div class="title">最近打卡</div>
+      <div class="record-list" id="recentRecords">
+        <div class="empty-record">暂无打卡记录</div>
+      </div>
+    </div>
+    
+    <!-- 底部导航 -->
+    <div class="tab-bar">
+      <a href="index.html" class="tab-item active">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-text">首页</span>
+      </a>
+      <a href="check.html" class="tab-item">
+        <span class="tab-icon">✅</span>
+        <span class="tab-text">打卡</span>
+      </a>
+      <a href="record.html" class="tab-item">
+        <span class="tab-icon">📋</span>
+        <span class="tab-text">记录</span>
+      </a>
+      <a href="prize.html" class="tab-item">
+        <span class="tab-icon">🎁</span>
+        <span class="tab-text">奖品</span>
+      </a>
+      <a href="setting.html" class="tab-item">
+        <span class="tab-icon">⚙️</span>
+        <span class="tab-text">设置</span>
+      </a>
+    </div>
+  </div>
+  
+  <!-- 打卡弹窗 -->
+  <div class="modal" id="checkModal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-title" id="modalTitle">打卡</div>
+      <div class="stars-label">选择完成情况</div>
+      <div class="stars-selector" id="starsSelector"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn-primary" onclick="submitCheck()">确认打卡</button>
+      </div>
+    </div>
+  </div>
+  
+  <script src="wx-api.js"></script>
+  <script src="app.js"></script>
+  <script>
+    // 页面初始化
+    document.addEventListener('DOMContentLoaded', function() {
+      initData();
+      loadData();
+    });
+    
+    // 初始化数据
+    function initData() {
+      // 初始化打卡项目
+      let checkItems = wx.getStorageSync('checkItems');
+      if (!checkItems || !Array.isArray(checkItems) || checkItems.length === 0) {
+        const defaultItems = [
+          { id: 1, name: '红火箭', icon: 'book' },
+          { id: 2, name: '古诗词', icon: 'read' },
+          { id: 3, name: '练字', icon: 'write' },
+          { id: 4, name: '计算', icon: 'calculate' },
+          { id: 5, name: '思维', icon: 'thinking' }
+        ];
+        wx.setStorageSync('checkItems', defaultItems);
+      }
+      
+      // 初始化星星总数
+      if (!wx.getStorageSync('totalStars')) {
+        wx.setStorageSync('totalStars', 0);
+      }
+      
+      // 初始化其他数据
+      if (!wx.getStorageSync('checkRecords')) {
+        wx.setStorageSync('checkRecords', []);
+      }
+      if (!wx.getStorageSync('prizes')) {
+        wx.setStorageSync('prizes', []);
+      }
+      if (!wx.getStorageSync('exchangeRecords')) {
+        wx.setStorageSync('exchangeRecords', []);
+      }
+    }
+    
+    // 加载数据
+    function loadData() {
+      // 获取星星总数
+      const totalStars = wx.getStorageSync('totalStars') || 0;
+      document.getElementById('totalStars').textContent = totalStars;
+      
+      // 获取打卡项目
+      const checkItems = wx.getStorageSync('checkItems') || [];
+      
+      // 获取今日打卡记录
+      const today = new Date().toLocaleDateString('zh-CN');
+      const checkRecords = wx.getStorageSync('checkRecords') || [];
+      const todayRecords = checkRecords.filter(r => r.date === today);
+      const todayCheckCount = new Set(todayRecords.map(r => r.itemId)).size;
+      
+      // 更新今日打卡状态
+      document.getElementById('todayStatus').textContent = `${todayCheckCount}/${checkItems.length} 项已完成`;
+      const progress = checkItems.length > 0 ? (todayCheckCount / checkItems.length) * 100 : 0;
+      document.getElementById('progressBar').style.width = progress + '%';
+      
+      // 获取最近打卡记录
+      const recentRecords = checkRecords
+        .sort((a, b) => new Date(b.date + ' ' + b.time) - new Date(a.date + ' ' + a.time))
+        .slice(0, 5);
+      
+      const recordsContainer = document.getElementById('recentRecords');
+      if (recentRecords.length > 0) {
+        recordsContainer.innerHTML = recentRecords.map(record => `
+          <div class="record-item">
+            <span class="record-name">${record.itemName}</span>
+            <span class="record-date">${record.date}</span>
+            <div class="record-stars">
+              ${Array(record.stars).fill('<span class="star">⭐</span>').join('')}
+            </div>
+          </div>
+        `).join('');
+      } else {
+        recordsContainer.innerHTML = '<div class="empty-record">暂无打卡记录</div>';
+      }
+    }
+    
+    // 跳转到打卡页面
+    function goToCheck() {
+      window.location.href = 'check.html';
+    }
+    
+    // 打卡相关变量
+    let selectedItem = null;
+    let selectedStars = 1;
+    
+    // 打卡弹窗
+    function openCheckModal(itemId, itemName) {
+      selectedItem = { id: itemId, name: itemName };
+      selectedStars = 1;
+      
+      document.getElementById('modalTitle').textContent = `打卡 - ${itemName}`;
+      
+      // 生成星星选择器
+      const selector = document.getElementById('starsSelector');
+      selector.innerHTML = [1, 2, 3].map(level => `
+        <div class="star-item ${level === 1 ? 'active' : ''}" onclick="selectStars(${level})">
+          ${Array(3).fill(0).map((_, i) => `
+            <span class="star ${level >= i + 1 ? 'selected' : ''}">${level >= i + 1 ? '⭐' : '☆'}</span>
+          `).join('')}
+          <span class="star-text">${level}星</span>
+        </div>
+      `).join('');
+      
+      document.getElementById('checkModal').style.display = 'flex';
+    }
+    
+    function closeModal() {
+      document.getElementById('checkModal').style.display = 'none';
+    }
+    
+    function selectStars(level) {
+      selectedStars = level;
+      const selector = document.getElementById('starsSelector');
+      selector.innerHTML = [1, 2, 3].map(l => `
+        <div class="star-item ${l === level ? 'active' : ''}" onclick="selectStars(${l})">
+          ${Array(3).fill(0).map((_, i) => `
+            <span class="star ${l >= i + 1 ? 'selected' : ''}">${l >= i + 1 ? '⭐' : '☆'}</span>
+          `).join('')}
+          <span class="star-text">${l}星</span>
+        </div>
+      `).join('');
+    }
+    
+    function submitCheck() {
+      if (!selectedItem) return;
+      
+      // 获取当前日期和时间
+      const now = new Date();
+      const date = now.toLocaleDateString('zh-CN');
+      const time = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      
+      // 获取已有记录
+      const checkRecords = wx.getStorageSync('checkRecords') || [];
+      
+      // 添加新记录
+      const newRecord = {
+        id: Date.now(),
+        itemId: selectedItem.id,
+        itemName: selectedItem.name,
+        stars: selectedStars,
+        date: date,
+        time: time
+      };
+      checkRecords.push(newRecord);
+      wx.setStorageSync('checkRecords', checkRecords);
+      
+      // 更新星星总数
+      const totalStars = wx.getStorageSync('totalStars') || 0;
+      wx.setStorageSync('totalStars', totalStars + selectedStars);
+      
+      wx.showToast({ title: '打卡成功' });
+      closeModal();
+      loadData();
+    }
+  </script>
+</body>
+</html>

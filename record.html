@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>记录 - 儿童学习打卡</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 导航栏 -->
+    <nav class="navbar">
+      <div class="nav-title">记录查询</div>
+    </nav>
+    
+    <!-- 标签选择器 -->
+    <div class="tab-bar" style="position: relative; margin-bottom: 15px; box-shadow: none; border-bottom: 1px solid #e0e0e0;">
+      <div class="tab-item active" id="checkTab" onclick="switchTab('check')">
+        <span class="tab-text">打卡记录</span>
+      </div>
+      <div class="tab-item" id="exchangeTab" onclick="switchTab('exchange')">
+        <span class="tab-text">兑奖记录</span>
+      </div>
+    </div>
+    
+    <!-- 打卡记录 -->
+    <div id="checkRecordsContainer">
+      <div class="record-list" id="checkRecords">
+        <div class="empty-record">暂无打卡记录</div>
+      </div>
+    </div>
+    
+    <!-- 兑奖记录 -->
+    <div id="exchangeRecordsContainer" style="display: none;">
+      <div class="record-list" id="exchangeRecords">
+        <div class="empty-record">暂无兑奖记录</div>
+      </div>
+    </div>
+    
+    <!-- 底部导航 -->
+    <div class="tab-bar">
+      <a href="index.html" class="tab-item">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-text">首页</span>
+      </a>
+      <a href="check.html" class="tab-item">
+        <span class="tab-icon">✅</span>
+        <span class="tab-text">打卡</span>
+      </a>
+      <a href="record.html" class="tab-item active">
+        <span class="tab-icon">📋</span>
+        <span class="tab-text">记录</span>
+      </a>
+      <a href="prize.html" class="tab-item">
+        <span class="tab-icon">🎁</span>
+        <span class="tab-text">奖品</span>
+      </a>
+      <a href="setting.html" class="tab-item">
+        <span class="tab-icon">⚙️</span>
+        <span class="tab-text">设置</span>
+      </a>
+    </div>
+  </div>
+  
+  <style>
+    .tab-bar .tab-item { flex: 1; }
+    .tab-bar .tab-item.active { color: #4CAF50; }
+    .record-group { margin-bottom: 20px; }
+    .group-date { font-size: 12px; color: #999; margin-bottom: 10px; display: block; }
+    .exchange-item { display: flex; justify-content: space-between; align-items: center; }
+    .cost-text { color: #f44336; font-weight: bold; }
+  </style>
+  
+  <script src="wx-api.js"></script>
+  <script>
+    let activeTab = 'check';
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      loadRecords();
+    });
+    
+    function switchTab(tab) {
+      activeTab = tab;
+      
+      document.getElementById('checkTab').classList.toggle('active', tab === 'check');
+      document.getElementById('exchangeTab').classList.toggle('active', tab === 'exchange');
+      
+      document.getElementById('checkRecordsContainer').style.display = tab === 'check' ? 'block' : 'none';
+      document.getElementById('exchangeRecordsContainer').style.display = tab === 'exchange' ? 'block' : 'none';
+    }
+    
+    function loadRecords() {
+      // 加载打卡记录
+      const checkRecords = wx.getStorageSync('checkRecords') || [];
+      const groupedCheckRecords = groupByDate(checkRecords);
+      
+      const checkContainer = document.getElementById('checkRecords');
+      if (groupedCheckRecords.length > 0) {
+        checkContainer.innerHTML = groupedCheckRecords.map(group => `
+          <div class="record-group">
+            <span class="group-date">${group.date}</span>
+            ${group.records.map(record => `
+              <div class="card record-item">
+                <span class="record-name">${record.itemName}</span>
+                <div class="record-stars">
+                  ${Array(record.stars).fill('<span class="star">⭐</span>').join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `).join('');
+      } else {
+        checkContainer.innerHTML = '<div class="empty-record">暂无打卡记录</div>';
+      }
+      
+      // 加载兑奖记录
+      const exchangeRecords = wx.getStorageSync('exchangeRecords') || [];
+      const groupedExchangeRecords = groupByDate(exchangeRecords);
+      
+      const exchangeContainer = document.getElementById('exchangeRecords');
+      if (groupedExchangeRecords.length > 0) {
+        exchangeContainer.innerHTML = groupedExchangeRecords.map(group => `
+          <div class="record-group">
+            <span class="group-date">${group.date}</span>
+            ${group.records.map(record => `
+              <div class="card record-item exchange-item">
+                <span class="record-name">${record.prizeName}</span>
+                <span class="cost-text">-${record.cost}⭐</span>
+              </div>
+            `).join('')}
+          </div>
+        `).join('');
+      } else {
+        exchangeContainer.innerHTML = '<div class="empty-record">暂无兑奖记录</div>';
+      }
+    }
+    
+    function groupByDate(records) {
+      const sorted = records.sort((a, b) => new Date(b.date) - new Date(a.date));
+      const grouped = {};
+      
+      sorted.forEach(record => {
+        if (!grouped[record.date]) {
+          grouped[record.date] = [];
+        }
+        grouped[record.date].push(record);
+      });
+      
+      return Object.keys(grouped).map(date => ({
+        date: date,
+        records: grouped[date]
+      }));
+    }
+  </script>
+</body>
+</html>

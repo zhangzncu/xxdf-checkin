@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设置 - 儿童学习打卡</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 导航栏 -->
+    <nav class="navbar">
+      <div class="nav-title">设置</div>
+    </nav>
+    
+    <!-- 设置卡片 -->
+    <div class="card">
+      <div class="setting-section">
+        <div class="section-title">数据管理</div>
+        <div class="setting-item" onclick="clearData()">
+          <span class="item-text">清除所有数据</span>
+          <span class="item-arrow">→</span>
+        </div>
+      </div>
+      
+      <div class="setting-section">
+        <div class="section-title">关于</div>
+        <div class="setting-item">
+          <span class="item-text">版本号</span>
+          <span class="item-value">1.0.0</span>
+        </div>
+        <div class="setting-item">
+          <span class="item-text">儿童学习打卡</span>
+          <span class="item-arrow">→</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 底部导航 -->
+    <div class="tab-bar">
+      <a href="index.html" class="tab-item">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-text">首页</span>
+      </a>
+      <a href="check.html" class="tab-item">
+        <span class="tab-icon">✅</span>
+        <span class="tab-text">打卡</span>
+      </a>
+      <a href="record.html" class="tab-item">
+        <span class="tab-icon">📋</span>
+        <span class="tab-text">记录</span>
+      </a>
+      <a href="prize.html" class="tab-item">
+        <span class="tab-icon">🎁</span>
+        <span class="tab-text">奖品</span>
+      </a>
+      <a href="setting.html" class="tab-item active">
+        <span class="tab-icon">⚙️</span>
+        <span class="tab-text">设置</span>
+      </a>
+    </div>
+  </div>
+  
+  <style>
+    .setting-section { margin-top: 20px; }
+    .setting-section:first-child { margin-top: 0; }
+    .section-title { font-size: 12px; color: #999; margin-bottom: 10px; }
+    .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+    .setting-item:last-child { border-bottom: none; }
+    .item-text { font-size: 16px; color: #333; }
+    .item-value { font-size: 16px; color: #999; }
+    .item-arrow { font-size: 16px; color: #ccc; }
+  </style>
+  
+  <script src="wx-api.js"></script>
+  <script>
+    function clearData() {
+      if (confirm('确定要清除所有数据吗？此操作不可恢复。')) {
+        // 清除所有本地存储数据
+        localStorage.removeItem('checkItems');
+        localStorage.removeItem('checkRecords');
+        localStorage.removeItem('prizes');
+        localStorage.removeItem('exchangeRecords');
+        localStorage.removeItem('totalStars');
+        
+        // 重新加载页面
+        wx.showToast({ title: '数据已清除' });
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
+    }
+  </script>
+</body>
+</html>
